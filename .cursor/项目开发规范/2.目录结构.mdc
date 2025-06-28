@@ -1,0 +1,93 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+
+
+## 2.1 核心目录（结构化说明）
+core文件下的文件夹，当前只是举例，请按需创建。
+
+```plaintext
+root/
+├── core/
+│   ├── domain/                 # 领域层
+│   │   ├── entities/          # 业务实体（如Document.py）
+│   │   ├── value_objects/     # 值对象（如FilePath.py）
+│   │   ├── services/          # 核心业务逻辑（如FormatConverter.py）
+│   │   └── events/            # 业务事件定义（如FileChangeEvent.py）
+│   │
+│   ├── application/           # 应用层
+│   │   ├── use_cases/        # 用例实现（如FileManagementUseCase.py）
+│   │   ├── ports/            # 接口定义（如PersistencePort.py）
+│   │   └── dtos/             # 数据传输对象（如FileMetadataDTO.py）
+│   │
+│   ├── interface_adapters/    # 适配器层
+│   │   ├── input/            # 输入适配
+│   │   │   ├── cli/         # 命令行参数解析（如CliParser.py）
+│   │   │   └── gui/         # 图形界面事件处理（如GuiEventHandler.py）
+│   │   ├── output/           # 输出适配
+│   │   │   ├── presenters/  # 终端输出格式化（如TerminalPresenter.py）
+│   │   │   └── renderers/   # 图形界面渲染（如TkinterRenderer.py）
+│   │   └── converters/      # 数据格式转换（如PdfToTextConverter.py）
+│   │
+│   └── infrastructure/       # 基础设施层
+│       ├── persistence/      # 数据存储实现（如FileStorage.py）
+│       ├── system/           # 系统API封装（如SystemAPI.py）
+│       └── security/         # 安全模块（如LocalEncryption.py）
+│
+├── req_docs/               # 用于存放需求文档,用于描述整个项目的所需要的功能
+│    ├──需求总结文档.md
+│    └──...
+├── architectures/          # 项目启动时生成的全局架构文档
+│   ├── 项目总览.md          # 整体技术栈/依赖关系/架构图
+│   └── 项目系统分析.md       # 系统层级/需求分析
+│
+├── task_plans/             # 项目启动时生成的全局整体规划的任务计划
+│   └── 任务计划.md          # 总体开发计划
+│   
+│
+├── cdd_files/                # 代码功能运行用例目录（CDD文件夹，严格镜像core结构）
+│	└── ...                   # 镜像文件夹
+│
+├── tdd_files/                # 测试目录（TDD文件夹，严格镜像core结构）
+│	└── ...                   # 镜像文件夹
+│
+├── dev_docs/                 # 开发文档目录（严格镜像core结构）
+│	└── ...                   # 镜像文件夹
+│
+└── memory_bank/              # 使用ai工具memory_bank生成的文档，用于项目局部规划与分析
+	└──模块(or功能or文件名)/
+		├── van/ # 开发分析文档 
+		├── creative/ # 创意设计文档 
+		├── reflect
+		├── archive
+
+```
+
+---
+
+## 2.2 文件镜像规则
+- **路径镜像示例**：  
+  - `/core/domain/entities/document.py` →  
+    `/tdd_files/domain/entities/test_document.py`  
+    `/dev_docs/domain/entities/document.md`  
+    `/cdd_files/domain/entities/document.py`  
+  
+  - `/core/infrastructure/persistence/file_storage.py` →  
+    `/tdd_files/infrastructure/persistence/test_file_storage.py`  
+    `/dev_docs/infrastructure/persistence/file_storage.md  
+    `/cdd_files/infrastructure/persistence/file_storage.py`  
+
+- **约束**：  
+  - 测试、文档、用例文件必须与 `core` 文件严格同名且路径一致。  
+  - 禁止在测试/文档/用例目录中创建 `core` 以外的文件夹。  
+  - 如果有不对称的文件夹或文件，请删除，保持最新。
+  - 任务计划会每个领域对象的实现情况
+  - 以上目录严格按照镜像规则创建文件，不得创建额外文件。
+---
+
+
+
+
