@@ -1,166 +1,153 @@
 """
 文档来源：
 - 文件：docs_source/topics/04_versions.ipynb
-- 主题：版本管理（Version Management）
-- 描述：展示了 mandala 的版本管理功能，包括依赖追踪和版本检测
+- 主题：版本管理
+- 描述：展示了如何管理和追踪代码变更
 - 关键概念：
-  1. 版本配置：启用和管理版本
-  2. 依赖追踪：检测代码变更影响
-  3. 版本检测：识别破坏性和非破坏性变更
-  4. 机器学习示例：数字识别模型版本管理
+  1. 版本定义：函数代码和全局变量的集合
+  2. 变更分类：破坏性和非破坏性变更
+  3. 依赖追踪：自动识别和管理依赖
+  4. 版本历史：基于内容的版本控制
 - 相关文档：
   - docs/docs/topics/04_versions.md
-  - docs/docs/tutorials/02_ml.md
+  - docs/docs/blog/02_deps.md
 
-本示例展示了如何使用 mandala 的版本管理功能。
-主要功能包括：
-1. 版本管理的配置和启用
-2. 依赖追踪和版本检测
-3. 处理破坏性和非破坏性变更
-4. 机器学习模型的版本管理
+本示例展示了版本管理的基本功能：
+1. 检查和分析版本
+2. 处理代码变更
+3. 管理依赖关系
+4. 追踪版本历史
 """
 
-import os
-import numpy as np
 from sklearn.datasets import load_digits
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
-from mandala.imports import Storage, op, track, MList, MDict
-from typing import Tuple, Any
+from mandala.imports import Storage, op, track
+from mandala.utils import mock_input
+from unittest.mock import patch
 
-# 配置存储路径
-DB_PATH = "mandala_storage/version_demo.db"
-os.makedirs("mandala_storage", exist_ok=True)
-if os.path.exists(DB_PATH):
-    os.remove(DB_PATH)
-
-# 创建存储实例，启用版本管理
-storage = Storage(
-    db_path=DB_PATH,
-    deps_path="__main__"  # 只追踪当前模块中定义的函数
-)
-
-# 设置随机种子以保证结果可重现
-np.random.seed(0)
-
-# 全局变量，用于演示版本变化
+# 全局变量，用于演示依赖变更
 N_CLASS = 10
 
-# 1. 基础数据处理函数
-@track  # 追踪非记忆化函数
+@track
 def scale_data(X):
-    """标准化数据。"""
-    print("标准化数据...")
+    """数据标准化 V1：只进行中心化
+    
+    参数:
+        X: 输入特征矩阵
+    返回:
+        标准化后的特征矩阵
+    """
     return StandardScaler(with_mean=True, with_std=False).fit_transform(X)
 
 @op
-def load_data() -> Tuple[Any, Any]:
-    """加载数字数据集。"""
-    print(f"加载{N_CLASS}个类别的数据...")
+def load_data():
+    """加载数字识别数据集
+    
+    返回:
+        特征矩阵和标签
+    """
     X, y = load_digits(n_class=N_CLASS, return_X_y=True)
-    print(f"数据形状: {X.shape}, 标签形状: {y.shape}")
     return X, y
 
 @op
-def train_model(X: Any, y: Any, scale: bool = False) -> Any:
-    """训练逻辑回归模型。"""
-    print("训练模型...")
+def train_model(X, y, scale=False):
+    """训练逻辑回归模型
+    
+    参数:
+        X: 特征矩阵
+        y: 标签
+        scale: 是否进行标准化
+    返回:
+        训练好的模型
+    """
     if scale:
-        print("使用标准化数据")
         X = scale_data(X)
-    model = LogisticRegression(max_iter=1000, solver="liblinear")
-    model.fit(X, y)
-    print("模型训练完成")
-    return model
+    return LogisticRegression(max_iter=1000, solver='liblinear').fit(X, y)
 
 @op
-def eval_model(model: Any, X: Any, y: Any, scale: bool = False) -> float:
-    """评估模型性能。"""
-    print("评估模型...")
-    if scale:
-        print("使用标准化数据")
-        X = scale_data(X)
-    score = model.score(X, y)
-    print(f"模型准确率: {score:.4f}")
-    return score
-
-def demo_initial_version():
-    """演示初始版本的功能。"""
-    print("\n1. 初始版本测试")
-    print("-" * 50)
+def eval_model(model, X, y, scale=False):
+    """评估模型性能 V1：返回原始准确率
     
+    参数:
+        model: 训练好的模型
+        X: 特征矩阵
+        y: 标签
+        scale: 是否进行标准化
+    返回:
+        模型准确率
+    """
+    if scale:
+        X = scale_data(X)
+    return model.score(X, y)
+
+def demonstrate_version_management():
+    """演示版本管理功能"""
+    # 声明全局变量
+    global N_CLASS, scale_data, eval_model
+    
+    storage = Storage(deps_path='__main__')
+    
+    print("1. 运行初始版本:")
     with storage:
-        # 加载数据
         X, y = load_data()
-        
-        # 训练和评估两个模型（有无标准化）
-        results = {}
         for scale in [False, True]:
             model = train_model(X, y, scale=scale)
             acc = eval_model(model, X, y, scale=scale)
-            # 直接打印结果
-            print(f"\n标准化={scale}的结果:")
-            print(f"准确率: {acc}")
+            print(f"- 使用标准化: {scale}, 准确率: {acc}")
     
-    # 查看版本信息
-    print("\n函数版本信息:")
-    print("\ntrain_model 的版本:")
-    print(storage.versions(train_model))
-    print("\neval_model 的版本:")
-    print(storage.versions(eval_model))
-
-def demo_version_changes():
-    """演示版本变化的影响。"""
-    print("\n2. 版本变化测试")
-    print("-" * 50)
+    print("\n2. 检查版本信息:")
+    versions = storage.versions(train_model)
+    print("- train_model 的版本:")
+    print(versions)
     
-    # 修改全局变量
-    global N_CLASS
+    print("\n3. 模拟代码变更:")
+    # 修改全局变量（破坏性变更）
     N_CLASS = 5
-    print(f"修改类别数为: {N_CLASS}")
+    print("- 修改 N_CLASS 为", N_CLASS)
     
     # 修改 scale_data 函数（破坏性变更）
     @track
-    def scale_data(X):
-        """修改后的标准化函数。"""
-        print("使用修改后的标准化方法...")
+    def new_scale_data(X):
+        """数据标准化 V2：进行中心化和标准化"""
         return StandardScaler(with_mean=True, with_std=True).fit_transform(X)
+    scale_data = new_scale_data
+    print("- 更新 scale_data 函数")
     
     # 修改 eval_model 函数（非破坏性变更）
     @op
-    def eval_model(model: Any, X: Any, y: Any, scale: bool = False) -> float:
-        """修改后的评估函数（仅格式变化）。"""
-        print("评估模型...")
+    def new_eval_model(model, X, y, scale=False):
+        """评估模型性能 V2：返回四舍五入后的准确率"""
         if scale:
-            print("使用标准化数据")
             X = scale_data(X)
-        score = round(model.score(X, y), 4)
-        print(f"模型准确率: {score:.4f}")
-        return score
+        return round(model.score(X, y), 2)
+    eval_model = new_eval_model
+    print("- 更新 eval_model 函数")
     
-    with storage:
-        # 重新运行相同的实验
-        X, y = load_data()
-        for scale in [False, True]:
-            model = train_model(X, y, scale=scale)
-            acc = eval_model(model, X, y, scale=scale)
-            # 直接打印结果
-            print(f"\n标准化={scale}的结果:")
-            print(f"准确率: {acc}")
+    print("\n4. 运行更新后的代码:")
+    # 模拟用户输入：y（N_CLASS 变更）, n（eval_model 变更）, y（scale_data 变更）
+    answers = ['y', 'n', 'y']
+    with patch('builtins.input', mock_input(answers)):
+        with storage:
+            X, y = load_data()
+            for scale in [False, True]:
+                model = train_model(X, y, scale=scale)
+                acc = eval_model(model, X, y, scale=scale)
+                print(f"- 使用标准化: {scale}, 准确率: {acc}")
     
-    # 查看更新后的版本信息
-    print("\n更新后的函数版本信息:")
-    print("\ntrain_model 的版本:")
-    print(storage.versions(train_model))
-    print("\neval_model 的版本:")
-    print(storage.versions(eval_model))
+    print("\n5. 分析计算历史:")
+    cf = storage.cf(eval_model).expand_all()
+    print("- 计算框架结构:")
+    print(cf)
+    
+    print("\n6. 检查更新后的版本:")
+    versions = storage.versions(eval_model)
+    print("- eval_model 的版本:")
+    print(versions)
 
 def main():
-    """运行所有示例。"""
-    print("开始运行版本管理示例...")
-    demo_initial_version()
-    demo_version_changes()
-    print("\n示例运行完成。")
+    print("演示版本管理功能...")
+    demonstrate_version_management()
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()
