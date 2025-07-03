@@ -1,0 +1,107 @@
+[
+  {
+    "timestamp": "2025-07-01T15:44:32.629316",
+    "function": "square",
+    "inputs": {
+      "args": [
+        0
+      ],
+      "kwargs": {}
+    },
+    "outputs": 0
+  },
+  {
+    "timestamp": "2025-07-01T15:44:32.629316",
+    "function": "add_constant",
+    "inputs": {
+      "args": [],
+      "kwargs": {
+        "x": 0,
+        "c": 1
+      }
+    },
+    "outputs": 1
+  },
+  {
+    "timestamp": "2025-07-01T15:44:32.630301",
+    "function": "add_constant",
+    "inputs": {
+      "args": [],
+      "kwargs": {
+        "x": 0,
+        "c": 2
+      }
+    },
+    "outputs": 2
+  },
+  {
+    "timestamp": "2025-07-01T15:44:32.630301",
+    "function": "square",
+    "inputs": {
+      "args": [
+        1
+      ],
+      "kwargs": {}
+    },
+    "outputs": 1
+  },
+  {
+    "timestamp": "2025-07-01T15:44:32.630301",
+    "function": "add_constant",
+    "inputs": {
+      "args": [],
+      "kwargs": {
+        "x": 1,
+        "c": 1
+      }
+    },
+    "outputs": 2
+  },
+  {
+    "timestamp": "2025-07-01T15:44:32.630301",
+    "function": "add_constant",
+    "inputs": {
+      "args": [],
+      "kwargs": {
+        "x": 1,
+        "c": 2
+      }
+    },
+    "outputs": 3
+  },
+  {
+    "timestamp": "2025-07-01T15:44:32.630301",
+    "function": "square",
+    "inputs": {
+      "args": [
+        2
+      ],
+      "kwargs": {}
+    },
+    "outputs": 4
+  },
+  {
+    "timestamp": "2025-07-01T15:44:32.630301",
+    "function": "add_constant",
+    "inputs": {
+      "args": [],
+      "kwargs": {
+        "x": 4,
+        "c": 1
+      }
+    },
+    "outputs": 5
+  },
+  {
+    "timestamp": "2025-07-01T15:44:32.630301",
+    "function": "add_constant",
+    "inputs": {
+      "args": [],
+      "kwargs": {
+        "x": 4,
+        "c": 2
+      }
+    },
+    "outputs": 6
+  }
+]
