@@ -2,6 +2,8 @@
 A minimal OOP wrapper around dot/graphviz
 """
 import difflib
+import os
+import uuid
 from .common_imports import *
 from .config import Config
 import tempfile
@@ -10,7 +12,6 @@ import webbrowser
 from typing import Literal
 from graphviz import Source
 from IPython import display
-import os
 
 if Config.has_pil:
     from PIL import Image
@@ -405,23 +406,24 @@ def write_output(
     Writes the given dot string to a dot file (temp file by default) and then
     optionally shows it in the browser, opens it in a program, or does nothing.
     """
-    # 为临时文件设置本地目录以避免权限问题
-    temp_dir = Path(output_path).parent / '_temp'
-    temp_dir.mkdir(exist_ok=True)
-    
-    # make a temp file and write the dot string to it
-    if output_path is None:
-        tfile = tempfile.NamedTemporaryFile(suffix=f".{output_ext}", delete=False, dir=temp_dir)
-        output_path = Path(tfile.name)
-    with tempfile.NamedTemporaryFile(mode="w", delete=False, dir=temp_dir, suffix='.dot') as f:
-        path = f.name
-        f.write(dot_string)
-    
+    dot_source_filename = f'temp_dot_{uuid.uuid4()}.dot'
     try:
-        cmd = f"dot -T {output_ext} -o {output_path} {path}"
+        with open(dot_source_filename, 'w', encoding='utf-8') as f:
+            f.write(dot_string)
+
+        if output_path is None:
+            # If no output path is given, create a temporary output file in current dir
+            output_filename = f'temp_output_{uuid.uuid4()}.{output_ext}'
+            output_path = Path(output_filename)
+        else:
+            output_path = Path(output_path)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        cmd = f'dot -T{output_ext} -o "{output_path}" "{dot_source_filename}"'
         subprocess.call(cmd, shell=True)
     finally:
-        os.remove(path)
+        if os.path.exists(dot_source_filename):
+            os.remove(dot_source_filename)
 
     if show_how == "browser":
         assert output_ext in [

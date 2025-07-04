@@ -2311,7 +2311,7 @@ class ComputationFrame:
         if print_dot:
             print(dot_string)
         output_ext = 'svg' if path is None else path.split('.')[-1]
-        write_output(dot_string, output_ext='svg', output_path=path, show_how=show_how,)
+        write_output(dot_string, output_ext='svg', output_path=path, show_how=show_how)
 
 
     def __repr__(self) -> str:

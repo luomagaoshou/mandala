@@ -19,7 +19,7 @@
 4. 计算历史追踪
 """
 
-from mandala1.imports import Storage, op
+from mandala.imports import Storage, op
 
 @op
 def inc(x):
