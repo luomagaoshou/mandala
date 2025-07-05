@@ -19,7 +19,7 @@
 4. 计算历史追踪
 """
 
-from mandala.imports import Storage, op
+from mandala1.imports import Storage, op
 
 @op
 def inc(x):
@@ -77,13 +77,16 @@ def demonstrate_advanced_cf():
         xs = [inc(i) for i in range(5)]
         ys = [add(x, z=42) for x in xs] + [square(x) for x in range(5, 10)]
         zs = [divmod_(x, y) for x, y in zip(xs, ys[3:8])]
-        
+        print(xs, ys, zs)
         print("- xs:", [storage.unwrap(x) for x in xs])
         print("- ys:", [storage.unwrap(y) for y in ys])
         print("- zs:", [storage.unwrap(z) for z in zs])
-    cf = (storage.cf(add) | storage.cf(square)).expand_all()
-    cf.draw(verbose=True, path='mydemo/svg/computation_history.svg')
-    return
+    # cf = ((storage.cf(add) 
+    #        | 
+    #        storage.cf(square))
+    #       .expand_all())
+    # cf.draw(verbose=True, path='mydemo/svg/computation_history.svg')
+    # return
     print("\n2. 分析中间层计算:")
     # 获取 add 和 square 操作的并集视图
     cf_union = (storage.cf(add) | storage.cf(square)).expand_all()
@@ -107,6 +110,8 @@ def demonstrate_advanced_cf():
     print("- 下游计算框架:")
     print(cf_downstream)
 
+
+    cf.draw(verbose=True, path='mydemo/svg/computation_history.svg')
 def main():
     print("演示计算框架的高级功能...")
     demonstrate_advanced_cf()
