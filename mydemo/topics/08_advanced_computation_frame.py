@@ -19,6 +19,7 @@
 4. 计算历史追踪
 """
 
+import pandas as pd
 from mandala1.imports import Storage, op
 
 @op
@@ -77,7 +78,7 @@ def demonstrate_advanced_cf():
         xs = [inc(i) for i in range(5)]
         ys = [add(x, z=42) for x in xs] + [square(x) for x in range(5, 10)]
         zs = [divmod_(x, y) for x, y in zip(xs, ys[3:8])]
-        print(xs, ys, zs)
+        
         print("- xs:", [storage.unwrap(x) for x in xs])
         print("- ys:", [storage.unwrap(y) for y in ys])
         print("- zs:", [storage.unwrap(z) for z in zs])
@@ -89,11 +90,48 @@ def demonstrate_advanced_cf():
     # return
     print("\n2. 分析中间层计算:")
     # 获取 add 和 square 操作的并集视图
+    print("\n2. 使用并集和expand_all分析计算:")
+    # `|` (并集) 操作会合并两个计算框架的节点和数据。
+    # `.expand_all()` 会自动追踪并拉取所有相关的上游和下游计算，从而构建一个完整的计算图。
     cf_union = (storage.cf(add) | storage.cf(square)).expand_all()
-    print("- 并集计算框架:")
+    print("- 联合并扩展后的计算框架 (结构):")
     print(cf_union)
+
+    # 我们可以将计算图可视化，以便更直观地理解其结构
+    cf_union.draw(verbose=True, path='mydemo/svg/computation_history.svg')
+    print("- 计算图已保存到 'mydemo/svg/computation_history.svg'")
+
+    print("\n3. 从计算框架中提取数据:")
+    print("`ComputationFrame` 可以被看作是计算历史的数据库。我们可以使用 `.eval()` 方法直接查询它的结果，并以 pandas DataFrame 的形式返回。")
+
+    # 为了进行查询，我们首先需要知道图中节点的名称
+    print("\n可用变量节点名 (vnames):", cf_union.vnames)
+    print("可用函数节点名 (fnames):", cf_union.fnames)
+
+    # .eval() 查询时，会自动处理节点间的连接关系，并返回实际的Python对象值
+    # 我们选择一些相关的输入和输出来展示
+    # 注意：节点名是自动生成的，可能会有 'add_0', 'square_0', 'output_0' 等后缀。
+    # 我们从上面打印的节点列表中动态选择我们感兴趣的节点进行查询。
+    vnames = cf_union.vnames
+    query_nodes = sorted([
+        n for n in vnames if any(
+            keyword in n for keyword in ('x', 'y', 'z', 'w', 'output')
+        )
+    ])
+    print(f"\n将自动查询以下节点: {query_nodes}")
+
+    try:
+        # 使用 .eval() 获取一个包含实际 Python 对象的 DataFrame
+        # `*query_nodes` 将列表展开为独立的参数
+        result_df = cf_union.eval(*query_nodes)
+        print("\n查询结果 (DataFrame):")
+        with pd.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', 1000):
+            print(result_df)
+    except Exception as e:
+        print(f"\n提取DataFrame时出错: {e}")
+        print("这可能是由于自动生成的节点名与预期不符或节点间没有明确的连接关系。请检查上面打印的'可用节点名'并手动调整 .eval() 中的参数。")
     
-    print("\n3. 分析上游计算:")
+    print("\n4. 分析上游计算:")
     # 获取 divmod_ 的上游计算
     cf = storage.cf(divmod_).expand_all()
     # 获取第一个变量名
@@ -102,7 +140,7 @@ def demonstrate_advanced_cf():
     print("- 上游计算框架:")
     print(cf_upstream)
     
-    print("\n4. 分析下游计算:")
+    print("\n5. 分析下游计算:")
     # 获取 inc 的下游计算
     cf = storage.cf(inc).expand_all()
     var_name = next(iter(cf.vs.keys()))
@@ -110,8 +148,6 @@ def demonstrate_advanced_cf():
     print("- 下游计算框架:")
     print(cf_downstream)
 
-
-    cf.draw(verbose=True, path='mydemo/svg/computation_history.svg')
 def main():
     print("演示计算框架的高级功能...")
     demonstrate_advanced_cf()

@@ -22,8 +22,8 @@
 from sklearn.datasets import load_digits
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
-from mandala.imports import Storage, op, track
-from mandala.utils import mock_input
+from mandala1.imports import Storage, op, track
+from mandala1.utils import mock_input
 from unittest.mock import patch
 
 # 全局变量，用于演示依赖变更

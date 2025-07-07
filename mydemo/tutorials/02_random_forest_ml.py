@@ -104,6 +104,7 @@ def main():
     # 转换为数据框并显示统计信息
     df = cf.df()
     print("\n计算历史统计:")
+    print(df)
     print(f"总计算步骤: {len(df)}")
     print(f"计算图中的操作: {', '.join(col for col in df.columns if not col.startswith('_'))}")
 
