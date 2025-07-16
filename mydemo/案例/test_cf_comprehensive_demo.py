@@ -136,6 +136,8 @@ def test_cf_methods():
     print("✅ ComputationFrame核心方法测试通过")
     return True
 
+
+
 def main():
     """运行所有测试"""
     print("🚀 开始 ComputationFrame 综合演示测试")
@@ -157,6 +159,26 @@ def main():
         # 运行核心方法测试
         test_cf_methods()
         
+        # 测试第9阶段单节点操作
+        print("\n测试第9阶段：单节点操作")
+        demo = ComputationFrameDemo()
+        
+        # 创建测试用的ComputationFrame
+        with demo.storage:
+            from cf_comprehensive_operations_demo import 数据预处理, 特征提取
+            测试数据 = [1, 2, 3, 4, 5]
+            处理结果 = 数据预处理(测试数据)
+            特征结果 = 特征提取(处理结果)
+        
+        cf = demo.storage.cf(特征结果).expand_back(recursive=True)
+        结果cf = demo.第9阶段_单节点操作(cf)
+        
+        # 验证操作结果
+        assert isinstance(结果cf, type(cf))
+        assert len(结果cf.nodes) > 0
+        结果cf._check()  # 验证完整性
+        print("✅ 第9阶段单节点操作测试通过")
+        
         print("\n" + "="*60)
         print("🎉 所有测试通过！")
         print("\n📋 测试总结:")
@@ -165,6 +187,7 @@ def main():
         print("✅ 错误处理测试 - 通过")
         print("✅ 单独阶段测试 - 通过")
         print("✅ 核心方法测试 - 通过")
+        print("✅ 单节点操作测试 - 通过")
         
         print("\n💡 测试建议:")
         print("1. 演示功能完整且稳定")
