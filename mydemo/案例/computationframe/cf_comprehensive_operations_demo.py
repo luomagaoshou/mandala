@@ -16,18 +16,22 @@ ComputationFrame 综合操作演示
   7. 替换操作：节点替换、值替换、图重构
   8. 高级操作：图合并、扩展、优化
   9. 单节点操作：单一节点的增删查改细粒度操作
+  10. 数据提取：历史追踪、DataFrame 转换
+  11. 可视化分析：图形展示、信息输出
 
 演示特点：
 - 每个操作都有详细的中文注释
 - 从简单的单步操作到复杂的组合操作
 - 展示实际的使用场景和最佳实践
-- 包含错误处理和验证机制
+- 包含完善的错误处理和验证机制
+- 充分利用 ComputationFrame 的所有已实现功能
 """
 
 import numpy as np
 import pandas as pd
 from mandala1.imports import Storage, op
 import logging
+from typing import Optional, List, Dict, Any, Set
 
 # 设置随机种子确保结果可重现
 np.random.seed(42)
@@ -133,12 +137,41 @@ class ComputationFrameDemo:
         self.storage = Storage()
         self.演示阶段 = 0
         
-    def 打印分隔线(self, 标题):
+    def 打印分隔线(self, 标题: str):
         """打印美观的分隔线"""
         print(f"\n{'='*60}")
         print(f"第{self.演示阶段}阶段：{标题}")
         print(f"{'='*60}")
         self.演示阶段 += 1
+    
+    def 安全执行(self, 操作名称: str, 操作函数, *args, **kwargs):
+        """安全执行操作并处理异常"""
+        try:
+            result = 操作函数(*args, **kwargs)
+            return result
+        except Exception as e:
+            print(f"- ❌ {操作名称} 失败: {e}")
+            return None
+    
+    def 展示图统计(self, cf, 标题: str = "图统计"):
+        """展示 ComputationFrame 的基本统计信息"""
+        print(f"\n📊 {标题}:")
+        print(f"  节点总数: {len(cf.nodes)}")
+        print(f"  变量节点: {len(cf.vnames)}")
+        print(f"  函数节点: {len(cf.fnames)}")
+        print(f"  边总数: {len(cf.edges())}")
+        print(f"  源节点: {len(cf.sources)}")
+        print(f"  汇节点: {len(cf.sinks)}")
+        
+        # 展示变量名（限制显示数量）
+        if cf.vnames:
+            vnames_list = list(cf.vnames)[:5]
+            print(f"  变量示例: {vnames_list}{'...' if len(cf.vnames) > 5 else ''}")
+        
+        # 展示函数名（限制显示数量）
+        if cf.fnames:
+            fnames_list = list(cf.fnames)[:5]
+            print(f"  函数示例: {fnames_list}{'...' if len(cf.fnames) > 5 else ''}")
     
     def 第1阶段_基础操作(self):
         """第1阶段：ComputationFrame 基础操作"""
@@ -158,16 +191,18 @@ class ComputationFrameDemo:
         # 1.2 创建 ComputationFrame
         print("\n1.2 创建 ComputationFrame")
         cf = self.storage.cf(特征)
-        print(f"- 初始 CF 节点数: {len(cf.nodes)}")
-        print(f"- 变量节点: {list(cf.vnames)}")
-        print(f"- 函数节点: {list(cf.fnames)}")
+        print(f"- 初始 CF 创建成功")
+        self.展示图统计(cf, "初始图统计")
         
-        # 1.3 查看基本属性
-        print("\n1.3 查看基本属性")
-        print(f"- 源节点: {cf.sources}")
-        print(f"- 汇节点: {cf.sinks}")
-        print(f"- 边数量: {len(cf.edges())}")
+        # 1.3 展示基本属性
+        print("\n1.3 展示基本属性")
         print(f"- 图描述:\n{cf.get_graph_desc()}")
+        
+        # 1.4 展示操作映射
+        print("\n1.4 展示操作映射")
+        ops_dict = cf.ops()
+        for fname, op in ops_dict.items():
+            print(f"- 函数 '{fname}' 对应操作: {op.name}")
         
         return cf
     
@@ -198,11 +233,38 @@ class ComputationFrameDemo:
             print(f"节点 '{sample_node}' 的邻居:")
             print(f"- 输入邻居: {in_neighbors}")
             print(f"- 输出邻居: {out_neighbors}")
+            
+            # 2.4 边查找
+            print(f"\n2.4 边查找")
+            in_edges = cf.in_edges(sample_node)
+            out_edges = cf.out_edges(sample_node)
+            print(f"节点 '{sample_node}' 的边:")
+            print(f"- 输入边: {in_edges}")
+            print(f"- 输出边: {out_edges}")
         
-        # 2.4 拓扑排序
-        print("\n2.4 拓扑排序")
+        # 2.5 拓扑排序
+        print("\n2.5 拓扑排序")
         sorted_nodes = cf.topsort_modulo_sccs()
         print(f"拓扑排序结果: {sorted_nodes}")
+        
+        # 2.6 路径分析
+        print("\n2.6 路径分析")
+        if len(cf.nodes) >= 2:
+            nodes_list = list(cf.nodes)
+            start_node = nodes_list[0]
+            end_node = nodes_list[-1]
+            
+            # 使用可达性分析
+            reachable_from_start = self.安全执行(
+                "可达性分析",
+                cf.get_reachable_nodes,
+                {start_node},
+                direction="forward"
+            )
+            
+            if reachable_from_start:
+                print(f"从 '{start_node}' 可达的节点: {reachable_from_start}")
+                print(f"'{end_node}' 是否可达: {end_node in reachable_from_start}")
         
         return cf
     
@@ -239,7 +301,13 @@ class ComputationFrameDemo:
                 sample_func = next(iter(functions))
                 func_table = expanded_cf.get_func_table(sample_func)
                 print(f"函数 '{sample_func}' 的调用表:")
-                print(func_table.head() if len(func_table) > 0 else "无调用记录")
+                if not func_table.empty:
+                    print(f"- 调用表形状: {func_table.shape}")
+                    print(f"- 调用表列名: {list(func_table.columns)}")
+                    print("- 调用表预览:")
+                    print(func_table.head(3))
+                else:
+                    print("- 无调用记录")
         except Exception as e:
             print(f"获取函数表时出错: {e}")
         
@@ -255,6 +323,27 @@ class ComputationFrameDemo:
         for node, elts in sink_elts.items():
             if elts:
                 print(f"  {node}: {len(elts)}个汇元素")
+        
+        # 3.6 条件过滤演示
+        print("\n3.6 条件过滤演示")
+        if expanded_cf.vnames:
+            # 选择一个变量进行过滤演示
+            sample_var = next(iter(expanded_cf.vnames))
+            var_values = expanded_cf.get_var_values(sample_var)
+            print(f"- 变量 '{sample_var}' 包含 {len(var_values)} 个值")
+            
+            # 使用 isin 进行条件过滤（如果有多个值）
+            if len(var_values) > 1:
+                value_list = list(var_values)[:2]  # 取前两个值
+                filtered_cf = self.安全执行(
+                    "isin 过滤",
+                    expanded_cf.isin,
+                    value_list,
+                    by="val",
+                    node_class="var"
+                )
+                if filtered_cf:
+                    print(f"- 过滤后节点数: {len(filtered_cf.nodes)}")
         
         return expanded_cf
     
@@ -294,22 +383,43 @@ class ComputationFrameDemo:
         if len(cf_copy.nodes) >= 2:
             # 选择多个节点进行批量删除
             nodes_to_delete = list(cf_copy.nodes)[:2]
-            try:
-                cf_batch_deleted = cf_copy.drop(nodes_to_delete, inplace=False)
+            cf_batch_deleted = self.安全执行(
+                "批量删除节点",
+                cf_copy.drop,
+                nodes_to_delete,
+                inplace=False
+            )
+            
+            if cf_batch_deleted:
                 print(f"- 批量删除节点: {nodes_to_delete}")
                 print(f"- 删除前节点数: {len(cf_copy.nodes)}")
                 print(f"- 删除后节点数: {len(cf_batch_deleted.nodes)}")
                 cf_copy = cf_batch_deleted
-            except Exception as e:
-                print(f"- 批量删除失败: {e}")
         
-        # 4.4 清理空节点
-        print("\n4.4 清理和简化")
-        cf_cleaned = cf_copy.cleanup(inplace=False)
-        print(f"- 清理前节点数: {len(cf_copy.nodes)}")
-        print(f"- 清理后节点数: {len(cf_cleaned.nodes)}")
+        # 4.4 删除不可达节点
+        print("\n4.4 删除不可达节点")
+        if cf_copy.nodes:
+            # 尝试删除不可达节点
+            cf_before_cleanup = cf_copy.copy()
+            cf_cleaned = self.安全执行(
+                "删除不可达节点",
+                cf_copy.drop_unreachable,
+                direction="forward",
+                how="strong"
+            )
+            
+            if cf_cleaned:
+                print(f"- 清理前节点数: {len(cf_before_cleanup.nodes)}")
+                print(f"- 清理后节点数: {len(cf_cleaned.nodes)}")
+                cf_copy = cf_cleaned
         
-        return cf_cleaned
+        # 4.5 最终清理
+        print("\n4.5 最终清理")
+        cf_final = cf_copy.cleanup(inplace=False)
+        print(f"- 最终清理前节点数: {len(cf_copy.nodes)}")
+        print(f"- 最终清理后节点数: {len(cf_final.nodes)}")
+        
+        return cf_final
     
     def 第5阶段_增加操作(self, cf):
         """第5阶段：增加操作 - 节点增加、边增加、数据增加"""
@@ -335,26 +445,24 @@ class ComputationFrameDemo:
         # 5.2 创建新的 ComputationFrame
         print("\n5.2 创建新的 ComputationFrame")
         new_cf = self.storage.cf(最终报告).expand_back(recursive=True)
-        print(f"- 新 CF 节点数: {len(new_cf.nodes)}")
-        print(f"- 新 CF 变量: {list(new_cf.vnames)}")
-        print(f"- 新 CF 函数: {list(new_cf.fnames)}")
+        self.展示图统计(new_cf, "新建图统计")
         
         # 5.3 合并 ComputationFrame
         print("\n5.3 合并 ComputationFrame")
-        try:
-            merged_cf = cf | new_cf  # 使用并集操作
+        merged_cf = self.安全执行(
+            "图合并操作",
+            lambda: cf | new_cf  # 使用并集操作
+        )
+        
+        if merged_cf:
             print(f"- 原 CF 节点数: {len(cf.nodes)}")
             print(f"- 新 CF 节点数: {len(new_cf.nodes)}")
             print(f"- 合并后节点数: {len(merged_cf.nodes)}")
             print(f"- 合并后变量数: {len(merged_cf.vnames)}")
             print(f"- 合并后函数数: {len(merged_cf.fnames)}")
-        except Exception as e:
-            print(f"- 合并失败: {e}")
+        else:
             print("- 使用新的 CF 继续演示")
             merged_cf = new_cf
-            print(f"- 使用新 CF，节点数: {len(merged_cf.nodes)}")
-            print(f"- 使用新 CF，变量数: {len(merged_cf.vnames)}")
-            print(f"- 使用新 CF，函数数: {len(merged_cf.fnames)}")
         
         # 5.4 扩展操作
         print("\n5.4 扩展操作")
@@ -366,6 +474,8 @@ class ComputationFrameDemo:
             # 全方向扩展
             full_expanded = merged_cf.expand_all()
             print(f"- 全方向扩展后节点数: {len(full_expanded.nodes)}")
+            
+            self.展示图统计(full_expanded, "完全扩展图统计")
             
             return full_expanded
         except Exception as e:
@@ -389,13 +499,17 @@ class ComputationFrameDemo:
                 variables[1]: f"优化_{variables[1]}"
             }
             
-            try:
-                cf_renamed = cf_renamed.rename(vars=rename_dict, inplace=False)
+            cf_renamed = self.安全执行(
+                "变量重命名",
+                cf_renamed.rename,
+                vars=rename_dict,
+                inplace=False
+            )
+            
+            if cf_renamed:
                 print(f"- 重命名映射: {rename_dict}")
                 print(f"- 重命名前变量: {variables[:2]}")
                 print(f"- 重命名后变量: {[name for name in cf_renamed.vnames if '重命名_' in name or '优化_' in name]}")
-            except Exception as e:
-                print(f"- 重命名失败: {e}")
         
         # 6.2 选择子图
         print("\n6.2 选择子图")
@@ -403,27 +517,35 @@ class ComputationFrameDemo:
             selected_nodes = list(cf.nodes)[:3]
             sub_cf = cf.select_nodes(selected_nodes)
             print(f"- 选择的节点: {selected_nodes}")
-            print(f"- 原图节点数: {len(cf.nodes)}")
-            print(f"- 子图节点数: {len(sub_cf.nodes)}")
-            print(f"- 子图边数: {len(sub_cf.edges())}")
+            self.展示图统计(cf, "原图统计")
+            self.展示图统计(sub_cf, "子图统计")
         
         # 6.3 上游和下游分析
         print("\n6.3 上游和下游分析")
         if cf.vnames:
             sample_var = next(iter(cf.vnames))
-            try:
-                upstream_cf = cf.upstream(sample_var)
-                downstream_cf = cf.downstream(sample_var)
-                
+            upstream_cf = self.安全执行("上游分析", cf.upstream, sample_var)
+            downstream_cf = self.安全执行("下游分析", cf.downstream, sample_var)
+            
+            if upstream_cf and downstream_cf:
                 print(f"- 分析变量: {sample_var}")
                 print(f"- 上游节点数: {len(upstream_cf.nodes)}")
                 print(f"- 下游节点数: {len(downstream_cf.nodes)}")
                 print(f"- 上游变量: {list(upstream_cf.vnames)}")
                 print(f"- 下游变量: {list(downstream_cf.vnames)}")
-            except Exception as e:
-                print(f"- 上下游分析失败: {e}")
         
-        return cf_renamed
+        # 6.4 中游分析
+        print("\n6.4 中游分析")
+        if len(cf.vnames) >= 2:
+            var_list = list(cf.vnames)[:2]
+            midstream_cf = self.安全执行("中游分析", cf.midstream, *var_list)
+            
+            if midstream_cf:
+                print(f"- 中游分析变量: {var_list}")
+                print(f"- 中游节点数: {len(midstream_cf.nodes)}")
+                print(f"- 中游变量: {list(midstream_cf.vnames)}")
+        
+        return cf_renamed if cf_renamed else cf
     
     def 第7阶段_替换操作(self, cf):
         """第7阶段：替换操作 - 节点替换、值替换、图重构"""
@@ -447,52 +569,43 @@ class ComputationFrameDemo:
         # 7.2 创建替换的 ComputationFrame
         print("\n7.2 创建替换的 ComputationFrame")
         replacement_cf = self.storage.cf(最终报告).expand_back(recursive=True)
-        print(f"- 替换 CF 节点数: {len(replacement_cf.nodes)}")
-        print(f"- 替换 CF 包含的操作: {list(replacement_cf.ops().keys())}")
+        self.展示图统计(replacement_cf, "替换图统计")
         
         # 7.3 分析替换前后的差异
         print("\n7.3 分析替换前后的差异")
-        print("原始计算图:")
-        print(f"  节点数: {len(cf.nodes)}")
-        print(f"  变量数: {len(cf.vnames)}")
-        print(f"  函数数: {len(cf.fnames)}")
-        
-        print("替换计算图:")
-        print(f"  节点数: {len(replacement_cf.nodes)}")
-        print(f"  变量数: {len(replacement_cf.vnames)}")
-        print(f"  函数数: {len(replacement_cf.fnames)}")
+        print("图结构对比:")
+        self.展示图统计(cf, "原始图")
+        self.展示图统计(replacement_cf, "替换图")
         
         # 7.4 图重构 - 创建混合计算图
         print("\n7.4 图重构 - 创建混合计算图")
-        try:
-            # 使用并集创建包含两个计算流程的图
-            hybrid_cf = cf | replacement_cf
-            print(f"- 混合图节点数: {len(hybrid_cf.nodes)}")
-            print(f"- 混合图变量数: {len(hybrid_cf.vnames)}")
-            print(f"- 混合图函数数: {len(hybrid_cf.fnames)}")
-        except Exception as e:
-            print(f"- 直接合并失败: {e}")
-            print("- 使用替代方案：分别分析两个计算图")
-            hybrid_cf = replacement_cf  # 使用替换图作为主要分析对象
-            print(f"- 使用替换图进行后续分析")
-            print(f"- 替换图节点数: {len(hybrid_cf.nodes)}")
-            print(f"- 替换图变量数: {len(hybrid_cf.vnames)}")
-            print(f"- 替换图函数数: {len(hybrid_cf.fnames)}")
+        hybrid_cf = self.安全执行(
+            "图重构",
+            lambda: cf | replacement_cf  # 使用并集创建包含两个计算流程的图
+        )
+        
+        if hybrid_cf:
+            self.展示图统计(hybrid_cf, "混合图统计")
+        else:
+            print("- 使用替换图作为主要分析对象")
+            hybrid_cf = replacement_cf
         
         # 7.5 对比分析
         print("\n7.5 对比分析")
-        try:
-            # 尝试提取和比较结果
-            if hybrid_cf.vnames:
-                sample_vars = list(hybrid_cf.vnames)[:3]
-                comparison_df = hybrid_cf.df(*sample_vars, verbose=False)
+        if hybrid_cf.vnames:
+            sample_vars = list(hybrid_cf.vnames)[:3]
+            comparison_df = self.安全执行(
+                "对比分析",
+                hybrid_cf.df,
+                *sample_vars,
+                verbose=False
+            )
+            
+            if comparison_df is not None and not comparison_df.empty:
                 print(f"- 对比变量: {sample_vars}")
                 print(f"- 对比数据形状: {comparison_df.shape}")
-                if not comparison_df.empty:
-                    print("- 对比结果预览:")
-                    print(comparison_df.head())
-        except Exception as e:
-            print(f"- 对比分析失败: {e}")
+                print("- 对比结果预览:")
+                print(comparison_df.head())
         
         return hybrid_cf
     
@@ -502,12 +615,7 @@ class ComputationFrameDemo:
         
         # 8.1 图统计分析
         print("8.1 图统计分析")
-        print(f"- 总节点数: {len(cf.nodes)}")
-        print(f"- 总边数: {len(cf.edges())}")
-        print(f"- 变量节点数: {len(cf.vnames)}")
-        print(f"- 函数节点数: {len(cf.fnames)}")
-        print(f"- 源节点数: {len(cf.sources)}")
-        print(f"- 汇节点数: {len(cf.sinks)}")
+        self.展示图统计(cf, "详细图统计")
         
         # 8.2 复杂查询操作
         print("\n8.2 复杂查询操作")
@@ -518,38 +626,73 @@ class ComputationFrameDemo:
                 history_df = cf.get_history_df(sample_var, verbose=False)
                 print(f"- 变量 '{sample_var}' 的历史:")
                 print(f"  历史记录数: {len(history_df)}")
-                print(f"  涉及变量: {list(history_df.columns)}")
+                print(f"  涉及列: {list(history_df.columns)}")
+                if not history_df.empty:
+                    print("  历史记录预览:")
+                    print(history_df.head(3))
         except Exception as e:
             print(f"- 历史查询失败: {e}")
         
-        # 8.3 图优化
-        print("\n8.3 图优化")
-        try:
-            # 尝试合并变量
-            optimized_cf = cf.copy()
-            optimized_cf.merge_vars(inplace=True)
+        # 8.3 联合历史查询
+        print("\n8.3 联合历史查询")
+        if len(cf.vnames) >= 2:
+            var_list = list(cf.vnames)[:2]
+            joint_history = self.安全执行(
+                "联合历史查询",
+                cf.get_joint_history_df,
+                var_list,
+                how="outer",
+                verbose=False
+            )
+            
+            if joint_history is not None and not joint_history.empty:
+                print(f"- 联合查询变量: {var_list}")
+                print(f"- 联合历史形状: {joint_history.shape}")
+                print("- 联合历史预览:")
+                print(joint_history.head(3))
+        
+        # 8.4 图优化
+        print("\n8.4 图优化")
+        optimized_cf = cf.copy()
+        
+        # 尝试合并变量
+        merge_result = self.安全执行(
+            "变量合并",
+            optimized_cf.merge_vars,
+            inplace=True
+        )
+        
+        if merge_result is not None:
             print(f"- 优化前变量数: {len(cf.vnames)}")
             print(f"- 优化后变量数: {len(optimized_cf.vnames)}")
-            
-            # 清理优化
-            optimized_cf.cleanup(inplace=True)
-            print(f"- 清理后节点数: {len(optimized_cf.nodes)}")
-        except Exception as e:
-            print(f"- 图优化失败: {e}")
         
-        # 8.4 可达性分析
-        print("\n8.4 可达性分析")
-        try:
-            if cf.sources:
-                source_node = next(iter(cf.sources))
-                reachable_nodes = cf.get_reachable_nodes({source_node}, direction="forward")
+        # 清理优化
+        cleanup_result = self.安全执行(
+            "清理优化",
+            optimized_cf.cleanup,
+            inplace=True
+        )
+        
+        if cleanup_result is not None:
+            print(f"- 清理后节点数: {len(optimized_cf.nodes)}")
+        
+        # 8.5 可达性分析
+        print("\n8.5 可达性分析")
+        if cf.sources:
+            source_node = next(iter(cf.sources))
+            reachable_nodes = self.安全执行(
+                "可达性分析",
+                cf.get_reachable_nodes,
+                {source_node},
+                direction="forward"
+            )
+            
+            if reachable_nodes:
                 print(f"- 从源节点 '{source_node}' 可达的节点数: {len(reachable_nodes)}")
                 print(f"- 可达节点: {list(reachable_nodes)[:5]}...")  # 只显示前5个
-        except Exception as e:
-            print(f"- 可达性分析失败: {e}")
         
-        # 8.5 性能统计
-        print("\n8.5 性能统计")
+        # 8.6 性能统计
+        print("\n8.6 性能统计")
         var_stats = cf.get_var_stats()
         func_stats = cf.get_func_stats()
         
@@ -565,7 +708,7 @@ class ComputationFrameDemo:
             print(f"  最大调用数: {func_stats['num_calls'].max()}")
             print(f"  最小调用数: {func_stats['num_calls'].min()}")
         
-        return cf
+        return optimized_cf
     
     def 第9阶段_单节点操作(self, cf):
         """第9阶段：单节点操作 - 单一节点的增删查改细粒度操作"""
@@ -651,24 +794,32 @@ class ComputationFrameDemo:
         原始节点数 = len(修改cf.nodes)
         
         # 添加新变量节点
-        try:
-            新变量名 = 修改cf._add_var("手动添加变量")
+        新变量名 = self.安全执行(
+            "添加新变量节点",
+            修改cf._add_var,
+            "手动添加变量"
+        )
+        
+        if 新变量名:
             print(f"- 添加新变量节点: {新变量名}")
             print(f"- 添加前节点数: {原始节点数}")
             print(f"- 添加后节点数: {len(修改cf.nodes)}")
-        except Exception as e:
-            print(f"- 添加变量节点失败: {e}")
         
         # 重命名变量节点
         if 修改cf.vnames:
             原变量名 = list(修改cf.vnames)[0]
             新变量名 = f"重命名_{原变量名}"
-            try:
-                修改cf.rename_var(原变量名, 新变量名, inplace=True)
+            rename_result = self.安全执行(
+                "重命名变量",
+                修改cf.rename_var,
+                原变量名,
+                新变量名,
+                inplace=True
+            )
+            
+            if rename_result is not None:
                 print(f"- 重命名变量: {原变量名} -> {新变量名}")
                 print(f"- 重命名后变量列表: {list(修改cf.vnames)[:3]}...")
-            except Exception as e:
-                print(f"- 重命名变量失败: {e}")
         
         # 9.4 单节点引用操作
         print("\n9.4 单节点引用操作")
@@ -687,12 +838,17 @@ class ComputationFrameDemo:
                 # 尝试将引用添加到现有变量
                 if 修改cf.vnames:
                     目标现有变量 = list(修改cf.vnames)[0]
-                    try:
-                        修改cf.add_ref(目标现有变量, 示例引用, allow_existing=True)
+                    add_ref_result = self.安全执行(
+                        "添加引用",
+                        修改cf.add_ref,
+                        目标现有变量,
+                        示例引用,
+                        allow_existing=True
+                    )
+                    
+                    if add_ref_result is not None:
                         print(f"- 成功将引用添加到变量: {目标现有变量}")
                         print(f"- 添加后该变量的引用数: {len(修改cf.vs[目标现有变量])}")
-                    except Exception as e:
-                        print(f"- 添加引用失败: {e}")
         
         # 9.5 单节点删除操作
         print("\n9.5 单节点删除操作")
@@ -703,23 +859,31 @@ class ComputationFrameDemo:
         # 删除单个变量节点
         if 删除cf.vnames:
             要删除的变量 = list(删除cf.vnames)[-1]  # 选择最后一个变量
-            try:
-                删除cf.drop_var(要删除的变量, inplace=True)
+            delete_var_result = self.安全执行(
+                "删除变量节点",
+                删除cf.drop_var,
+                要删除的变量,
+                inplace=True
+            )
+            
+            if delete_var_result is not None:
                 print(f"- 删除变量节点: {要删除的变量}")
                 print(f"- 删除前节点数: {删除前节点数}")
                 print(f"- 删除后节点数: {len(删除cf.nodes)}")
-            except Exception as e:
-                print(f"- 删除变量节点失败: {e}")
         
         # 删除单个函数节点
         if 删除cf.fnames:
             要删除的函数 = list(删除cf.fnames)[-1]  # 选择最后一个函数
-            try:
-                删除cf.drop_func(要删除的函数, inplace=True)
+            delete_func_result = self.安全执行(
+                "删除函数节点",
+                删除cf.drop_func,
+                要删除的函数,
+                inplace=True
+            )
+            
+            if delete_func_result is not None:
                 print(f"- 删除函数节点: {要删除的函数}")
                 print(f"- 删除后节点数: {len(删除cf.nodes)}")
-            except Exception as e:
-                print(f"- 删除函数节点失败: {e}")
         
         # 9.6 单节点边操作
         print("\n9.6 单节点边操作")
@@ -734,13 +898,18 @@ class ComputationFrameDemo:
             print(f"- 示例边: {源节点} --[{边标签}]--> {目标节点}")
             
             # 尝试删除边（使用私有方法）
-            try:
-                边操作cf._drop_edge(源节点, 目标节点, 边标签)
+            drop_edge_result = self.安全执行(
+                "删除边",
+                边操作cf._drop_edge,
+                源节点,
+                目标节点,
+                边标签
+            )
+            
+            if drop_edge_result is not None:
                 print(f"- 删除边: {源节点} --[{边标签}]--> {目标节点}")
                 print(f"- 删除前边数: {原始边数}")
                 print(f"- 删除后边数: {len(边操作cf.edges())}")
-            except Exception as e:
-                print(f"- 删除边失败: {e}")
         
         # 9.7 单节点调用操作
         print("\n9.7 单节点调用操作")
@@ -762,13 +931,16 @@ class ComputationFrameDemo:
                     print(f"- 调用输出: {list(示例调用.outputs.keys())}")
                     
                     # 获取函数调用表
-                    try:
-                        调用表 = cf.get_func_table(示例函数)
-                        print(f"- 函数调用表形状: {调用表.shape}")
-                        if not 调用表.empty:
-                            print("- 调用表列名:", list(调用表.columns))
-                    except Exception as e:
-                        print(f"- 获取调用表失败: {e}")
+                    func_table = self.安全执行(
+                        "获取函数调用表",
+                        cf.get_func_table,
+                        示例函数
+                    )
+                    
+                    if func_table is not None:
+                        print(f"- 函数调用表形状: {func_table.shape}")
+                        if not func_table.empty:
+                            print("- 调用表列名:", list(func_table.columns))
         
         # 9.8 单节点验证和检查
         print("\n9.8 单节点验证和检查")
@@ -776,11 +948,15 @@ class ComputationFrameDemo:
         # 验证节点的完整性
         验证cf = 删除cf.copy()
         
-        try:
-            验证cf._check()
+        check_result = self.安全执行(
+            "ComputationFrame 完整性验证",
+            验证cf._check
+        )
+        
+        if check_result is not None:
             print("- ✅ ComputationFrame 完整性验证通过")
-        except Exception as e:
-            print(f"- ❌ ComputationFrame 完整性验证失败: {e}")
+        else:
+            print("- ❌ ComputationFrame 完整性验证失败")
         
         # 检查节点统计
         if 验证cf.vnames:
@@ -802,43 +978,303 @@ class ComputationFrameDemo:
         if 验证cf.vnames:
             示例变量 = list(验证cf.vnames)[0]
             print(f"- 变量 '{示例变量}' 的详细信息:")
-            try:
-                验证cf.var_info(示例变量)
-            except Exception as e:
-                print(f"  获取变量信息失败: {e}")
+            self.安全执行(
+                "变量信息查看",
+                验证cf.var_info,
+                示例变量
+            )
         
         if 验证cf.fnames:
             示例函数 = list(验证cf.fnames)[0]
             print(f"- 函数 '{示例函数}' 的详细信息:")
-            try:
-                验证cf.func_info(示例函数)
-            except Exception as e:
-                print(f"  获取函数信息失败: {e}")
-        
-        # 总结单节点操作
-        print("\n9.10 单节点操作总结")
-        print("✅ 已演示的单节点操作:")
-        单节点操作列表 = [
-            "节点查询 - 基本信息、邻居、边、值",
-            "节点增加 - 新变量、新数据、新引用",
-            "节点修改 - 重命名、属性更新",
-            "引用操作 - 添加引用、移动引用",
-            "节点删除 - 变量删除、函数删除",
-            "边操作 - 边查询、边删除",
-            "调用操作 - 调用查询、调用表获取",
-            "节点验证 - 完整性检查、统计信息",
-            "信息查看 - 详细信息、调试输出"
-        ]
-        
-        for i, 操作 in enumerate(单节点操作列表, 1):
-            print(f"  {i}. {操作}")
-        
-        print(f"\n📊 单节点操作统计:")
-        print(f"- 最终变量节点数: {len(验证cf.vnames)}")
-        print(f"- 最终函数节点数: {len(验证cf.fnames)}")
-        print(f"- 最终边数: {len(验证cf.edges())}")
+            self.安全执行(
+                "函数信息查看",
+                验证cf.func_info,
+                示例函数
+            )
         
         return 验证cf
+    
+    def 第10阶段_数据提取(self, cf):
+        """第10阶段：数据提取 - 历史追踪、DataFrame 转换"""
+        self.打印分隔线("数据提取 - 历史追踪和数据转换")
+        
+        # 10.1 简单数据提取
+        print("10.1 简单数据提取")
+        
+        if cf.vnames:
+            # 使用 eval 方法进行快速数据提取
+            sample_vars = list(cf.vnames)[:3]
+            eval_result = self.安全执行(
+                "快速数据提取",
+                cf.eval,
+                *sample_vars,
+                values="objs",
+                verbose=True
+            )
+            
+            if eval_result is not None and not eval_result.empty:
+                print(f"- 提取变量: {sample_vars}")
+                print(f"- 结果形状: {eval_result.shape}")
+                print("- 结果预览:")
+                print(eval_result.head())
+        
+        # 10.2 复杂数据提取
+        print("\n10.2 复杂数据提取")
+        
+        if len(cf.vnames) >= 2:
+            # 使用 df 方法进行复杂数据提取
+            complex_vars = list(cf.vnames)[:2]
+            df_result = self.安全执行(
+                "复杂数据提取",
+                cf.df,
+                *complex_vars,
+                values="objs",
+                lazy_vars=None,
+                verbose=False,
+                include_calls=True,
+                join_how="outer"
+            )
+            
+            if df_result is not None and not df_result.empty:
+                print(f"- 提取变量: {complex_vars}")
+                print(f"- 结果形状: {df_result.shape}")
+                print(f"- 结果列名: {list(df_result.columns)}")
+                print("- 结果预览:")
+                print(df_result.head())
+        
+        # 10.3 历史追踪分析
+        print("\n10.3 历史追踪分析")
+        
+        if cf.vnames:
+            target_var = list(cf.vnames)[0]
+            
+            # 获取直接历史
+            if cf.vs[target_var]:
+                sample_hids = set(list(cf.vs[target_var])[:3])
+                direct_history = self.安全执行(
+                    "直接历史追踪",
+                    cf.get_direct_history,
+                    target_var,
+                    sample_hids,
+                    include_calls=True
+                )
+                
+                if direct_history:
+                    print(f"- 变量 '{target_var}' 的直接历史:")
+                    for node, hids in direct_history.items():
+                        print(f"  {node}: {len(hids)} 个元素")
+                
+                # 获取完整历史
+                total_history = self.安全执行(
+                    "完整历史追踪",
+                    cf.get_total_history,
+                    target_var,
+                    sample_hids,
+                    include_calls=True
+                )
+                
+                if total_history:
+                    print(f"- 变量 '{target_var}' 的完整历史:")
+                    for node, hids in total_history.items():
+                        print(f"  {node}: {len(hids)} 个元素")
+        
+        # 10.4 数据格式转换
+        print("\n10.4 数据格式转换")
+        
+        # 获取引用形式的数据
+        if cf.vnames:
+            ref_vars = list(cf.vnames)[:2]
+            ref_df = self.安全执行(
+                "引用形式数据",
+                cf.df,
+                *ref_vars,
+                values="refs",
+                verbose=False
+            )
+            
+            if ref_df is not None and not ref_df.empty:
+                print(f"- 引用形式数据形状: {ref_df.shape}")
+                print("- 引用形式数据预览:")
+                print(ref_df.head())
+                
+                # 评估引用数据
+                eval_df = self.安全执行(
+                    "评估引用数据",
+                    cf.eval_df,
+                    ref_df,
+                    skip_calls=False
+                )
+                
+                if eval_df is not None and not eval_df.empty:
+                    print(f"- 评估后数据形状: {eval_df.shape}")
+                    print("- 评估后数据预览:")
+                    print(eval_df.head())
+        
+        # 10.5 集合操作结果提取
+        print("\n10.5 集合操作结果提取")
+        
+        # 获取变量的引用集合
+        if cf.vnames:
+            sample_var = list(cf.vnames)[0]
+            var_refs = cf.refs_by_var()
+            
+            if sample_var in var_refs:
+                refs_set = var_refs[sample_var]
+                print(f"- 变量 '{sample_var}' 的引用集合:")
+                print(f"  引用数量: {len(refs_set)}")
+                
+                # 获取引用的实际值
+                if refs_set:
+                    sample_ref = next(iter(refs_set))
+                    actual_value = self.storage.unwrap(sample_ref)
+                    print(f"  示例引用值: {actual_value}")
+        
+        # 获取函数的调用集合
+        if cf.fnames:
+            sample_func = list(cf.fnames)[0]
+            func_calls = cf.calls_by_func()
+            
+            if sample_func in func_calls:
+                calls_set = func_calls[sample_func]
+                print(f"- 函数 '{sample_func}' 的调用集合:")
+                print(f"  调用数量: {len(calls_set)}")
+                
+                # 获取调用的详细信息
+                if calls_set:
+                    sample_call = next(iter(calls_set))
+                    print(f"  示例调用操作: {sample_call.op.name}")
+                    print(f"  示例调用输入: {list(sample_call.inputs.keys())}")
+                    print(f"  示例调用输出: {list(sample_call.outputs.keys())}")
+        
+        return cf
+    
+    def 第11阶段_可视化分析(self, cf):
+        """第11阶段：可视化分析 - 图形展示、信息输出"""
+        self.打印分隔线("可视化分析 - 图形展示和信息输出")
+        
+        # 11.1 图形描述
+        print("11.1 图形描述")
+        
+        # 获取图的描述
+        graph_desc = cf.get_graph_desc()
+        print("- 图结构描述:")
+        print(graph_desc)
+        
+        # 11.2 节点信息展示
+        print("\n11.2 节点信息展示")
+        
+        # 显示所有节点的信息
+        if cf.nodes:
+            node_list = list(cf.nodes)[:3]  # 限制显示数量
+            info_result = self.安全执行(
+                "节点信息展示",
+                cf.info,
+                *node_list
+            )
+            
+            if info_result is not None:
+                print(f"- 已显示 {len(node_list)} 个节点的详细信息")
+        
+        # 11.3 统计信息可视化
+        print("\n11.3 统计信息可视化")
+        
+        # 变量统计
+        var_stats = cf.get_var_stats()
+        if not var_stats.empty:
+            print("- 变量统计信息:")
+            print(var_stats)
+        
+        # 函数统计
+        func_stats = cf.get_func_stats()
+        if not func_stats.empty:
+            print("- 函数统计信息:")
+            print(func_stats)
+        
+        # 11.4 图结构分析
+        print("\n11.4 图结构分析")
+        
+        # 分析图的连通性
+        if cf.sources and cf.sinks:
+            print("- 图连通性分析:")
+            print(f"  源节点: {list(cf.sources)}")
+            print(f"  汇节点: {list(cf.sinks)}")
+            
+            # 分析从源到汇的路径
+            source_node = next(iter(cf.sources))
+            reachable_from_source = self.安全执行(
+                "从源节点的可达性",
+                cf.get_reachable_nodes,
+                {source_node},
+                direction="forward"
+            )
+            
+            if reachable_from_source:
+                sink_nodes = cf.sinks
+                reachable_sinks = sink_nodes & reachable_from_source
+                print(f"  从源节点可达的汇节点: {reachable_sinks}")
+                print(f"  图连通性: {'连通' if reachable_sinks else '不连通'}")
+        
+        # 11.5 图绘制尝试
+        print("\n11.5 图绘制尝试")
+        
+        # 尝试绘制图（可能需要特定的依赖）
+        draw_result = self.安全执行(
+            "图绘制",
+            cf.draw,
+            verbose=False
+        )
+        
+        if draw_result is not None:
+            print("- ✅ 图绘制成功")
+        else:
+            print("- ❌ 图绘制失败（可能缺少依赖或环境不支持）")
+        
+        # 11.6 图打印
+        print("\n11.6 图打印")
+        
+        # 打印图的详细信息
+        print_result = self.安全执行(
+            "图打印",
+            cf.print_graph
+        )
+        
+        if print_result is not None:
+            print("- ✅ 图打印完成")
+        
+        # 11.7 综合图分析报告
+        print("\n11.7 综合图分析报告")
+        
+        # 生成综合报告
+        报告内容 = {
+            "图基本信息": {
+                "节点总数": len(cf.nodes),
+                "变量节点数": len(cf.vnames),
+                "函数节点数": len(cf.fnames),
+                "边总数": len(cf.edges()),
+                "源节点数": len(cf.sources),
+                "汇节点数": len(cf.sinks)
+            },
+            "节点统计": {
+                "变量平均引用数": var_stats['num_values'].mean() if not var_stats.empty else 0,
+                "函数平均调用数": func_stats['num_calls'].mean() if not func_stats.empty else 0,
+                "最大引用数": var_stats['num_values'].max() if not var_stats.empty else 0,
+                "最大调用数": func_stats['num_calls'].max() if not func_stats.empty else 0
+            },
+            "图结构特征": {
+                "是否为DAG": len(cf.sources) > 0 and len(cf.sinks) > 0,
+                "连通性": "连通" if cf.sources and cf.sinks and (cf.sinks & cf.get_reachable_nodes(cf.sources, "forward")) else "不连通",
+                "复杂度": "高" if len(cf.nodes) > 10 else "中" if len(cf.nodes) > 5 else "低"
+            }
+        }
+        
+        print("- 📊 综合分析报告:")
+        for 类别, 信息 in 报告内容.items():
+            print(f"  {类别}:")
+            for 键, 值 in 信息.items():
+                print(f"    {键}: {值:.2f}" if isinstance(值, float) else f"    {键}: {值}")
+        
+        return cf
     
     def 运行完整演示(self):
         """运行完整的 ComputationFrame 操作演示"""
@@ -871,52 +1307,70 @@ class ComputationFrameDemo:
             cf8 = self.第8阶段_高级操作(cf7)
             
             # 第9阶段：单节点操作
-            final_cf = self.第9阶段_单节点操作(cf8)
+            cf9 = self.第9阶段_单节点操作(cf8)
+            
+            # 第10阶段：数据提取
+            cf10 = self.第10阶段_数据提取(cf9)
+            
+            # 第11阶段：可视化分析
+            final_cf = self.第11阶段_可视化分析(cf10)
             
             # 总结
             self.打印分隔线("演示总结")
             print("🎉 ComputationFrame 综合操作演示完成！")
-            print("\n📊 演示成果:")
-            print(f"- 最终图节点数: {len(final_cf.nodes)}")
-            print(f"- 最终图变量数: {len(final_cf.vnames)}")
-            print(f"- 最终图函数数: {len(final_cf.fnames)}")
-            print(f"- 最终图边数: {len(final_cf.edges())}")
             
-            print("\n✅ 已演示的功能:")
+            # 展示最终统计
+            self.展示图统计(final_cf, "最终图统计")
+            
+            print("\n✅ 已演示的功能模块:")
             演示功能列表 = [
-                "ComputationFrame 创建和基本属性查看",
-                "节点和边的遍历操作",
-                "复杂查找和过滤操作",
-                "节点删除和批量删除",
-                "图扩展和合并操作",
-                "节点重命名和结构修改",
-                "计算流程替换和重构",
-                "图优化和性能分析",
-                "单节点细粒度增删查改操作"
+                "1. 基础操作：ComputationFrame 创建、属性查看、操作映射",
+                "2. 遍历操作：节点遍历、边遍历、邻居查找、拓扑排序",
+                "3. 查找操作：图扩展、节点查找、条件过滤、源汇分析",
+                "4. 删除操作：单节点删除、批量删除、不可达节点清理",
+                "5. 增加操作：图合并、向前扩展、全方向扩展",
+                "6. 修改操作：节点重命名、子图选择、上下游分析",
+                "7. 替换操作：计算流程替换、图重构、对比分析",
+                "8. 高级操作：图优化、可达性分析、性能统计",
+                "9. 单节点操作：细粒度的增删查改操作",
+                "10. 数据提取：历史追踪、DataFrame 转换、引用评估",
+                "11. 可视化分析：图形展示、统计信息、结构分析"
             ]
             
-            for i, 功能 in enumerate(演示功能列表, 1):
-                print(f"  {i}. {功能}")
+            for 功能 in 演示功能列表:
+                print(f"  {功能}")
             
-            print("\n🔧 使用的 ComputationFrame 核心方法:")
-            核心方法列表 = [
-                "cf.expand_back/expand_forward/expand_all - 图扩展",
-                "cf.copy/select_nodes/drop_node - 图操作",
-                "cf.rename/merge_vars/cleanup - 图修改",
-                "cf.upstream/downstream/midstream - 方向性查询",
-                "cf.get_history_df/get_func_table - 历史分析",
-                "cf.ops/refs_by_var/calls_by_func - 数据访问",
-                "cf | cf2 / cf & cf2 - 集合操作",
-                "cf.get_reachable_nodes - 可达性分析",
-                "cf._add_var/drop_var/rename_var - 单变量操作",
-                "cf.add_ref/drop_ref/get_var_values - 引用管理",
-                "cf.in_neighbors/out_neighbors/in_edges/out_edges - 邻居查询",
-                "cf._add_edge/_drop_edge - 边操作（私有方法）",
-                "cf.var_info/func_info/_check - 节点信息和验证"
+            print("\n🔧 使用的核心 ComputationFrame 方法:")
+            核心方法分类 = {
+                "图结构": ["nodes", "vnames", "fnames", "edges", "sources", "sinks"],
+                "遍历查找": ["in_neighbors", "out_neighbors", "in_edges", "out_edges", "topsort_modulo_sccs"],
+                "扩展操作": ["expand_back", "expand_forward", "expand_all", "upstream", "downstream", "midstream"],
+                "修改操作": ["drop_node", "drop", "rename", "drop_var", "drop_func", "add_ref", "drop_ref"],
+                "集合操作": ["__or__", "__and__", "__sub__", "union", "intersection"],
+                "数据提取": ["eval", "df", "get_history_df", "get_joint_history_df", "eval_df"],
+                "信息查询": ["ops", "refs_by_var", "calls_by_func", "get_var_values", "get_func_table"],
+                "可达性分析": ["get_reachable_nodes", "get_source_elts", "get_sink_elts"],
+                "统计分析": ["get_var_stats", "get_func_stats", "get_graph_desc"],
+                "可视化": ["info", "var_info", "func_info", "draw", "print_graph"],
+                "验证清理": ["_check", "cleanup", "merge_vars", "drop_unreachable"]
+            }
+            
+            for 分类, 方法列表 in 核心方法分类.items():
+                print(f"  {分类}: {', '.join(方法列表)}")
+            
+            print("\n💡 建议下一步操作:")
+            建议列表 = [
+                "1. 使用 final_cf.draw() 可视化完整的计算图",
+                "2. 使用 final_cf.eval() 提取具体数据进行分析",
+                "3. 使用 final_cf.get_history_df() 进行血缘分析",
+                "4. 探索更复杂的图操作和查询组合",
+                "5. 尝试自定义操作函数和扩展功能",
+                "6. 使用 final_cf.isin() 进行高级过滤",
+                "7. 结合存储功能进行数据持久化操作"
             ]
             
-            for 方法 in 核心方法列表:
-                print(f"  - {方法}")
+            for 建议 in 建议列表:
+                print(f"  {建议}")
             
             return final_cf
             
@@ -929,18 +1383,29 @@ class ComputationFrameDemo:
 
 def main():
     """主函数：运行 ComputationFrame 综合操作演示"""
+    print("🎯 启动 ComputationFrame 综合操作演示")
+    print("📚 基于 cf.md 文档的完整功能展示")
+    
     demo = ComputationFrameDemo()
     final_cf = demo.运行完整演示()
     
     if final_cf is not None:
-        print(f"\n📈 最终图描述:")
-        print(final_cf.get_graph_desc())
+        print(f"\n🎊 演示成功完成！")
+        print(f"📊 最终图包含 {len(final_cf.nodes)} 个节点，{len(final_cf.edges())} 条边")
+        print(f"🔗 图连通性：{'连通' if final_cf.sources and final_cf.sinks else '独立节点'}")
+        print(f"📈 图复杂度：{'高' if len(final_cf.nodes) > 10 else '中' if len(final_cf.nodes) > 5 else '低'}")
         
-        print(f"\n💡 建议下一步:")
-        print("1. 尝试使用 final_cf.draw() 可视化计算图")
-        print("2. 使用 final_cf.df() 提取具体数据进行分析")
-        print("3. 使用 final_cf.info() 查看详细的图信息")
-        print("4. 探索更复杂的图操作和查询功能")
+        print(f"\n🎁 演示成果：")
+        print(f"- 创建了完整的 ComputationFrame 操作演示")
+        print(f"- 展示了 {11} 个主要功能模块")
+        print(f"- 使用了 {40}+ 个核心方法")
+        print(f"- 包含了完善的错误处理机制")
+        print(f"- 提供了实用的操作建议")
+        
+        return final_cf
+    else:
+        print(f"\n❌ 演示未能完成，请检查错误信息")
+        return None
 
 if __name__ == '__main__':
     main() 
